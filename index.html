@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=BIZ+UDPGothic:wght@400;700&display=swap">
 <style>
-/* 常時表示の夜間向けダーク単一テーマ。横向き: 左に現況、右に潮汐グラフ、下に時間別予報 */
+/* 常時表示の夜間向けダーク単一テーマ。縦: 1列でスクロール / 横: 現況・潮汐・時間別の3列を1画面に収める */
 :root{
   --bg:#0b1620; --panel:#112130; --line:#22384a; --fg:#e4edf2; --muted:#8aa0b0;
   --accent:#ff8a3d; --tide:#5cc8d6; --ok:#6fd39a; --warn:#ffc24a; --danger:#ff5a5a;
@@ -17,49 +17,52 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
+html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;
-  padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
-  display:flex;flex-direction:column;gap:10px;overflow-x:hidden}
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:10px;overflow-x:hidden;min-height:100%}
 button,input{font:inherit;color:inherit}
 .num{font-family:var(--num);font-variant-numeric:tabular-nums}
 
-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
-.tab{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer}
+header{display:flex;align-items:center;gap:10px}
+.tabs{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;white-space:nowrap;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer}
 .tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#1a0d03;font-weight:700}
 .tab:focus-visible,.btn:focus-visible{outline:2px solid var(--tide);outline-offset:2px}
-.clock{font-size:34px;font-weight:600;letter-spacing:.02em}
-.btn{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--muted)}
+.clock{font-size:32px;font-weight:600;letter-spacing:.02em;line-height:1}
+.btn{flex:none;background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--muted)}
 
-main{flex:1;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:10px;min-height:0}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+main{display:grid;grid-template-columns:1fr;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px}
 .label{font-size:12px;color:var(--muted);letter-spacing:.08em}
 
+.placeline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .place{font-size:22px;font-weight:700}
 .sub{color:var(--muted);font-size:13px}
 .now{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
-.big{font-size:56px;font-weight:600;line-height:1}
-.big small{font-size:22px;color:var(--muted);margin-left:2px}
+.big{font-size:48px;font-weight:600;line-height:1}
+.big small{font-size:20px;color:var(--muted);margin-left:2px}
 .wx{font-size:22px;font-weight:700}
-.wind{display:flex;align-items:center;gap:10px}
+.wind{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .arrow{width:40px;height:40px;flex:none}
+.wdir{font-size:18px;font-weight:700}
 .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:700;color:#0b1620}
 .pill.ok{background:var(--ok)} .pill.warn{background:var(--warn)} .pill.danger{background:var(--danger)}
-.kv{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--muted)}
+.kv{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;color:var(--muted)}
 .kv b{color:var(--fg);font-weight:400;font-family:var(--num);font-size:18px}
 
 .tidehead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
 .tidename{font-size:26px;font-weight:700;color:var(--tide)}
-canvas{width:100%;flex:1;min-height:160px;display:block}
-.events{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+canvas{width:100%;height:200px;display:block}
+.events{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .ev{border-top:2px solid var(--line);padding-top:4px}
 .ev.hi{border-color:var(--tide)} .ev.lo{border-color:var(--muted)}
-.ev .t{font-size:24px;font-weight:600}
+.ev .t{font-size:24px;font-weight:600;line-height:1.1}
 .ev .h{font-size:12px;color:var(--muted)}
 
 .hours{display:grid;grid-template-columns:repeat(12,minmax(56px,1fr));gap:6px;overflow-x:auto}
-.hr{text-align:center;display:flex;flex-direction:column;gap:2px;align-items:center;padding:4px 0;border-radius:8px}
+.hr{text-align:center;display:flex;flex-direction:column;gap:2px;align-items:center;padding:4px 0}
 .hr .t{color:var(--muted);font-size:13px}
 .hr .w{font-size:14px;font-weight:700}
 .hr .tmp{font-size:22px;font-weight:600}
@@ -70,19 +73,47 @@ canvas{width:100%;flex:1;min-height:160px;display:block}
 footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .err{color:var(--warn)}
 
-dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;max-width:min(420px,92vw)}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;max-width:min(420px,92vw);max-height:90vh}
 dialog::backdrop{background:rgba(0,0,0,.6)}
 .form{display:grid;gap:8px}
 .form input[type=text],.form input[type=number]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
 .list{display:grid;gap:4px;max-height:40vh;overflow:auto}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
 
-@media (max-width:760px), (orientation:portrait){
-  html,body{height:auto;min-height:100%}
-  main{grid-template-columns:1fr;flex:none}
-  canvas{flex:none;height:200px}
-  .big{font-size:46px}
-  .events{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* 横向き：スクロールなしで1画面に収める。文字は画面の高さに合わせて伸縮 */
+@media (orientation:landscape) and (min-width:560px){
+  html,body{height:100%;overflow:hidden}
+  body{padding-block:max(6px,1.5vh);gap:max(6px,1.5vh);font-size:clamp(12px,3.2vh,18px)}
+  header{gap:8px}
+  .tab{padding:clamp(3px,1vh,8px) clamp(10px,2vh,16px)}
+  .clock{font-size:clamp(22px,8vh,48px)}
+  main{flex:1;min-height:0;grid-template-columns:minmax(0,4fr) minmax(0,6fr) minmax(0,3fr)}
+  .card{padding:clamp(8px,2.2vh,16px) clamp(10px,2.4vh,18px);gap:clamp(4px,1.4vh,10px);overflow:hidden}
+  .label{font-size:clamp(10px,2.6vh,14px)}
+  .sub{font-size:clamp(10px,2.8vh,15px)}
+  .place{font-size:clamp(16px,5vh,30px)}
+  .now{gap:clamp(4px,1.6vh,12px) 12px}
+  .wx{font-size:clamp(15px,5vh,30px)}
+  .big{font-size:clamp(28px,12vh,80px)}
+  .big small{font-size:clamp(12px,4vh,26px)}
+  .arrow{width:clamp(24px,8vh,52px);height:clamp(24px,8vh,52px)}
+  .wdir{font-size:clamp(13px,4vh,22px)}
+  .pill{font-size:clamp(10px,2.8vh,15px)}
+  .kv{font-size:clamp(11px,2.8vh,15px);margin-top:auto}
+  .kv b{font-size:clamp(13px,3.8vh,22px)}
+  .tidename{font-size:clamp(16px,5.5vh,32px)}
+  canvas{height:auto;flex:1;min-height:0}
+  .events{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .ev .t{font-size:clamp(15px,5vh,30px)}
+  .ev .h{font-size:clamp(10px,2.6vh,14px)}
+  .hourscard{gap:clamp(2px,1vh,8px)}
+  .hours{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;gap:0}
+  .hr{display:grid;grid-template-columns:2.6em 2em 2.2em 1.1em 1.6em;align-items:center;gap:4px;padding:0;text-align:left}
+  .hr .t,.hr .w{font-size:clamp(10px,3vh,16px)}
+  .hr .tmp,.hr .ws{font-size:clamp(12px,3.6vh,20px);text-align:right}
+  .hr svg{width:clamp(10px,3vh,18px);height:clamp(10px,3vh,18px)}
+  footer{flex-wrap:nowrap;font-size:clamp(10px,2.4vh,12px);white-space:nowrap}
+  footer span:last-child{overflow:hidden;text-overflow:ellipsis;min-width:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -97,7 +128,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 
 <main>
   <section class="card" id="nowCard">
-    <div>
+    <div class="placeline">
       <div class="place" id="place">—</div>
       <div class="sub" id="date">—</div>
     </div>
@@ -118,11 +149,11 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
           <svg class="arrow" id="arrow" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 6 L27 26 L20 21 L13 26 Z" fill="var(--accent)"/></svg>
           <div class="big num" id="wind">--<small>m/s</small></div>
           <div>
-            <div id="windDir" style="font-size:18px;font-weight:700">—</div>
+            <div class="wdir" id="windDir">—</div>
             <div class="sub num" id="gust"></div>
           </div>
+          <span class="pill ok" id="windPill">—</span>
         </div>
-        <div style="margin-top:6px"><span class="pill ok" id="windPill">—</span></div>
       </div>
     </div>
     <div class="kv">
@@ -142,12 +173,12 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <canvas id="tide" aria-label="今日の潮位グラフ"></canvas>
     <div class="events" id="events"></div>
   </section>
-</main>
 
-<section class="card">
-  <div class="label">これから12時間</div>
-  <div class="hours" id="hours"></div>
-</section>
+  <section class="card hourscard">
+    <div class="label">これから12時間</div>
+    <div class="hours" id="hours"></div>
+  </section>
+</main>
 
 <footer>
   <span id="status">読み込み中…</span>
