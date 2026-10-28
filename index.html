@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>釣り場ボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+/* 常時表示の夜間向けダーク単一テーマ。横向き: 左に現況、右に潮汐グラフ、下に時間別予報 */
+:root{
+  --bg:#0b1620; --panel:#112130; --line:#22384a; --fg:#e4edf2; --muted:#8aa0b0;
+  --accent:#ff8a3d; --tide:#5cc8d6; --ok:#6fd39a; --warn:#ffc24a; --danger:#ff5a5a;
+  --num:"Barlow Condensed","Roboto Condensed","Arial Narrow",sans-serif;
+  --body:"BIZ UDPGothic","Hiragino Sans","Noto Sans JP",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:10px;overflow-x:hidden}
+button,input{font:inherit;color:inherit}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
+.tab{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer}
+.tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#1a0d03;font-weight:700}
+.tab:focus-visible,.btn:focus-visible{outline:2px solid var(--tide);outline-offset:2px}
+.clock{font-size:34px;font-weight:600;letter-spacing:.02em}
+.btn{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--muted)}
+
+main{flex:1;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:10px;min-height:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.label{font-size:12px;color:var(--muted);letter-spacing:.08em}
+
+.place{font-size:22px;font-weight:700}
+.sub{color:var(--muted);font-size:13px}
+.now{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.big{font-size:56px;font-weight:600;line-height:1}
+.big small{font-size:22px;color:var(--muted);margin-left:2px}
+.wx{font-size:22px;font-weight:700}
+.wind{display:flex;align-items:center;gap:10px}
+.arrow{width:40px;height:40px;flex:none}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:700;color:#0b1620}
+.pill.ok{background:var(--ok)} .pill.warn{background:var(--warn)} .pill.danger{background:var(--danger)}
+.kv{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--muted)}
+.kv b{color:var(--fg);font-weight:400;font-family:var(--num);font-size:18px}
+
+.tidehead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tidename{font-size:26px;font-weight:700;color:var(--tide)}
+canvas{width:100%;flex:1;min-height:160px;display:block}
+.events{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.ev{border-top:2px solid var(--line);padding-top:4px}
+.ev.hi{border-color:var(--tide)} .ev.lo{border-color:var(--muted)}
+.ev .t{font-size:24px;font-weight:600}
+.ev .h{font-size:12px;color:var(--muted)}
+
+.hours{display:grid;grid-template-columns:repeat(12,minmax(56px,1fr));gap:6px;overflow-x:auto}
+.hr{text-align:center;display:flex;flex-direction:column;gap:2px;align-items:center;padding:4px 0;border-radius:8px}
+.hr .t{color:var(--muted);font-size:13px}
+.hr .w{font-size:14px;font-weight:700}
+.hr .tmp{font-size:22px;font-weight:600}
+.hr .ws{font-size:18px;font-weight:600}
+.hr.warn .ws{color:var(--warn)} .hr.danger .ws{color:var(--danger)}
+.hr svg{width:18px;height:18px}
+
+footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.err{color:var(--warn)}
+
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;max-width:min(420px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.form{display:grid;gap:8px}
+.form input[type=text],.form input[type=number]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
+.list{display:grid;gap:4px;max-height:40vh;overflow:auto}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+
+@media (max-width:760px), (orientation:portrait){
+  html,body{height:auto;min-height:100%}
+  main{grid-template-columns:1fr;flex:none}
+  canvas{flex:none;height:200px}
+  .big{font-size:46px}
+  .events{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tabs" id="tabs"></div>
+  <button class="btn" id="btnEdit" type="button">地点編集</button>
+  <div class="clock num" id="clock">--:--</div>
+</header>
+
+<main>
+  <section class="card" id="nowCard">
+    <div>
+      <div class="place" id="place">—</div>
+      <div class="sub" id="date">—</div>
+    </div>
+    <div class="now">
+      <div>
+        <div class="label">天気</div>
+        <div class="wx" id="wx">—</div>
+        <div class="sub" id="pop"></div>
+      </div>
+      <div>
+        <div class="label">気温</div>
+        <div class="big num" id="temp">--<small>℃</small></div>
+        <div class="sub num" id="tempRange"></div>
+      </div>
+      <div style="grid-column:1/-1">
+        <div class="label">風速</div>
+        <div class="wind">
+          <svg class="arrow" id="arrow" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 6 L27 26 L20 21 L13 26 Z" fill="var(--accent)"/></svg>
+          <div class="big num" id="wind">--<small>m/s</small></div>
+          <div>
+            <div id="windDir" style="font-size:18px;font-weight:700">—</div>
+            <div class="sub num" id="gust"></div>
+          </div>
+        </div>
+        <div style="margin-top:6px"><span class="pill ok" id="windPill">—</span></div>
+      </div>
+    </div>
+    <div class="kv">
+      <span>波高 <b id="wave">-</b> m</span>
+      <span>水温 <b id="sst">-</b> ℃</span>
+      <span>日の出 <b id="sunrise">-</b></span>
+      <span>日の入 <b id="sunset">-</b></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="tidehead">
+      <span class="label">潮見表</span>
+      <span class="tidename" id="tideName">—</span>
+      <span class="sub num" id="moon"></span>
+    </div>
+    <canvas id="tide" aria-label="今日の潮位グラフ"></canvas>
+    <div class="events" id="events"></div>
+  </section>
+</main>
+
+<section class="card">
+  <div class="label">これから12時間</div>
+  <div class="hours" id="hours"></div>
+</section>
+
+<footer>
+  <span id="status">読み込み中…</span>
+  <span>データ: Open-Meteo / DWD・Copernicus。潮位は推算モデル値（平均海面基準）で目安です</span>
+</footer>
+
+<dialog id="dlg">
+  <div class="form">
+    <div class="label">登録地点</div>
+    <div class="list" id="locList"></div>
+    <div class="label" style="margin-top:8px">場所を検索して追加</div>
+    <form class="row" id="fSearch">
+      <input type="text" id="fQuery" placeholder="例：清水港、用宗、御前崎">
+      <button class="btn" id="btnSearch" type="submit">検索</button>
+    </form>
+    <div class="list" id="results"></div>
+    <details>
+      <summary class="sub">緯度経度で直接追加</summary>
+      <div class="form" style="margin-top:6px">
+        <input type="text" id="fName" placeholder="名前">
+        <div class="row">
+          <input type="number" id="fLat" step="0.0001" placeholder="緯度 35.0">
+          <input type="number" id="fLon" step="0.0001" placeholder="経度 138.5">
+        </div>
+        <button class="btn" id="btnAdd" type="button">追加</button>
+      </div>
+    </details>
+    <label class="row" style="justify-content:flex-start"><input type="checkbox" id="fRotate"> 1分ごとに地点を自動で切り替える</label>
+    <button class="btn" id="btnClose" type="button">閉じる</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+'use strict';
+
+var DEFAULTS=[];
+var REFRESH_MS=15*60*1000;
+
+var state={locs:load('tb_locs',DEFAULTS),idx:load('tb_idx',0),rotate:load('tb_rot',false),cache:{}};
+if(state.idx>=state.locs.length) state.idx=0;
+
+function load(k,d){try{var v=localStorage.getItem(k);return v===null?d:JSON.parse(v);}catch(e){return d;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function $(id){return document.getElementById(id);}
+function pad(n){return (n<10?'0':'')+n;}
+function hm(d){return pad(d.getHours())+':'+pad(d.getMinutes());}
+function parseT(s){var p=s.split(/[-T:]/);return new Date(+p[0],p[1]-1,+p[2],+p[3]||0,+p[4]||0);}
+
+var WX={0:'快晴',1:'晴れ',2:'晴れ時々曇り',3:'曇り',45:'霧',48:'霧',51:'霧雨',53:'霧雨',55:'霧雨',56:'霧雨',57:'霧雨',
+  61:'小雨',63:'雨',65:'大雨',66:'雨',67:'大雨',71:'小雪',73:'雪',75:'大雪',77:'雪',80:'にわか雨',81:'にわか雨',82:'強いにわか雨',
+  85:'にわか雪',86:'にわか雪',95:'雷雨',96:'雷雨',99:'雷雨'};
+function wxShort(c){if(c<=1)return'晴';if(c<=3)return c===2?'晴曇':'曇';if(c<=48)return'霧';if(c<=67||(c>=80&&c<=82))return'雨';if(c<=86)return'雪';return'雷';}
+var DIRS=['北','北北東','北東','東北東','東','東南東','南東','南南東','南','南南西','南西','西南西','西','西北西','北西','北北西'];
+function dirName(d){return DIRS[Math.round(d/22.5)%16];}
+function windLevel(v){return v>=8?'danger':v>=5?'warn':'ok';}
+function windText(v){return v>=8?'強風 出船注意':v>=5?'やや強い':'穏やか';}
+
+/* 月齢と潮名 */
+function moonAge(d){var ref=Date.UTC(2000,0,6,18,14);var syn=29.530588853;var a=((d.getTime()-ref)/864e5)%syn;return a<0?a+syn:a;}
+var TIDE=['大潮','大潮','大潮','中潮','中潮','中潮','中潮','小潮','小潮','小潮','長潮','若潮','中潮','中潮','大潮','大潮','大潮','大潮','中潮','中潮','中潮','中潮','小潮','小潮','小潮','長潮','若潮','中潮','中潮','大潮'];
+function tideName(d){var noon=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);return TIDE[Math.floor(moonAge(noon))%30];}
+
+/* 満潮・干潮を時系列から求める（放物線補間） */
+function extremes(times,h){
+  var out=[];
+  for(var i=1;i<h.length-1;i++){
+    if(h[i-1]==null||h[i]==null||h[i+1]==null)continue;
+    var hi=h[i]>h[i-1]&&h[i]>=h[i+1], lo=h[i]<h[i-1]&&h[i]<=h[i+1];
+    if(!hi&&!lo)continue;
+    var a=(h[i-1]-2*h[i]+h[i+1])/2,b=(h[i+1]-h[i-1])/2,off=a?-b/(2*a):0,val=a?h[i]-b*b/(4*a):h[i];
+    if(off>1)off=1;if(off<-1)off=-1;
+    out.push({t:new Date(times[i].getTime()+off*36e5),h:val,hi:hi});
+  }
+  return out;
+}
+
+/* 古いAndroidでも動くようXHRで取得 */
+function getJSON(u,ok,ng){
+  var x=new XMLHttpRequest();x.open('GET',u,true);x.timeout=20000;
+  x.onload=function(){if(x.status>=200&&x.status<300){try{ok(JSON.parse(x.responseText));}catch(e){ng('データ形式エラー');}}else ng('HTTP '+x.status);};
+  x.onerror=function(){ng('通信エラー');};x.ontimeout=function(){ng('タイムアウト');};
+  x.send();
+}
+function getData(loc,ok,ng){
+  var q='latitude='+loc.lat+'&longitude='+loc.lon+'&timezone=Asia%2FTokyo&forecast_days=3';
+  var w='https://api.open-meteo.com/v1/forecast?'+q+'&wind_speed_unit=ms'+
+    '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m'+
+    '&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability'+
+    '&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min';
+  var m='https://marine-api.open-meteo.com/v1/marine?'+q+'&cell_selection=sea'+
+    '&hourly=sea_level_height_msl,wave_height,sea_surface_temperature';
+  getJSON(w,function(wd){
+    getJSON(m,function(md){ok([wd,md]);},function(){ok([wd,null]);});
+  },ng);
+}
+
+/* 場所検索：国土地理院の地名検索 → 見つからなければOpen-Meteo */
+function searchPlace(q,done){
+  var out=[];
+  getJSON('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(q),function(r){
+    (r||[]).slice(0,15).forEach(function(f){out.push({name:f.properties.title,lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0]});});
+    if(out.length)done(out,null);else om();
+  },om);
+  function om(){
+    getJSON('https://geocoding-api.open-meteo.com/v1/search?count=10&language=ja&name='+encodeURIComponent(q),function(r){
+      (r.results||[]).forEach(function(p){out.push({name:p.name+(p.admin1?'（'+p.admin1+'）':''),lat:p.latitude,lon:p.longitude});});
+      done(out,null);
+    },function(e){done(out,e);});
+  }
+}
+
+function arrowSvg(deg){return '<svg viewBox="0 0 40 40" style="transform:rotate('+(deg+180)+'deg)"><path d="M20 4 L29 30 L20 23 L11 30 Z" fill="var(--accent)"/></svg>';}
+
+function render(loc,res){
+  var w=res[0],m=res[1],now=new Date();
+  var c=w.current;
+  $('place').textContent=loc.name;
+  $('wx').textContent=WX[c.weather_code]||'—';
+  $('temp').innerHTML=Math.round(c.temperature_2m)+'<small>℃</small>';
+  $('tempRange').textContent='最高 '+Math.round(w.daily.temperature_2m_max[0])+'℃ / 最低 '+Math.round(w.daily.temperature_2m_min[0])+'℃';
+  $('wind').innerHTML=c.wind_speed_10m.toFixed(1)+'<small>m/s</small>';
+  $('windDir').textContent=dirName(c.wind_direction_10m)+'の風';
+  $('gust').textContent='最大瞬間 '+c.wind_gusts_10m.toFixed(1)+' m/s';
+  $('arrow').style.transform='rotate('+(c.wind_direction_10m+180)+'deg)';
+  var lvl=windLevel(Math.max(c.wind_speed_10m,c.wind_gusts_10m*0.7));
+  var pill=$('windPill');pill.className='pill '+lvl;pill.textContent=windText(Math.max(c.wind_speed_10m,c.wind_gusts_10m*0.7));
+  $('sunrise').textContent=w.daily.sunrise[0].slice(11);
+  $('sunset').textContent=w.daily.sunset[0].slice(11);
+
+  /* 時間別 */
+  var ht=w.hourly.time.map(parseT),start=0;
+  while(start<ht.length&&ht[start]<new Date(now.getTime()-36e5+1))start++;
+  var pops=[];var html='';
+  for(var i=start;i<start+12&&i<ht.length;i++){
+    var ws=w.hourly.wind_speed_10m[i],l=windLevel(ws);pops.push(w.hourly.precipitation_probability[i]||0);
+    html+='<div class="hr '+(l==='ok'?'':l)+'"><span class="t num">'+ht[i].getHours()+'時</span><span class="w">'+wxShort(w.hourly.weather_code[i])+'</span>'+
+      '<span class="tmp num">'+Math.round(w.hourly.temperature_2m[i])+'°</span>'+arrowSvg(w.hourly.wind_direction_10m[i])+
+      '<span class="ws num">'+ws.toFixed(0)+'</span></div>';
+  }
+  $('hours').innerHTML=html;
+  $('pop').textContent=pops.length?'12時間の降水確率 最大'+Math.max.apply(null,pops)+'%':'';
+
+  /* 海況 */
+  var tideOK=m&&m.hourly&&m.hourly.sea_level_height_msl;
+  if(m&&m.hourly){
+    var mt=m.hourly.time.map(parseT),k=0;
+    while(k<mt.length-1&&mt[k+1]<=now)k++;
+    var wv=m.hourly.wave_height[k],st=m.hourly.sea_surface_temperature[k];
+    $('wave').textContent=wv==null?'-':wv.toFixed(1);
+    $('sst').textContent=st==null?'-':st.toFixed(1);
+  }
+  $('tideName').textContent=tideName(now);
+  $('moon').textContent='月齢 '+moonAge(now).toFixed(1);
+  if(tideOK){
+    var tt=m.hourly.time.map(parseT),hh=m.hourly.sea_level_height_msl;
+    var ex=extremes(tt,hh);
+    var up=ex.filter(function(e){return e.t>=new Date(now.getTime()-3*36e5);}).slice(0,4);
+    $('events').innerHTML=up.map(function(e){
+      var day=e.t.getDate()!==now.getDate()?'翌':'';
+      return '<div class="ev '+(e.hi?'hi':'lo')+'"><div class="label">'+(e.hi?'満潮':'干潮')+'</div><div class="t num">'+day+hm(e.t)+'</div><div class="h num">'+(e.h>=0?'+':'')+Math.round(e.h*100)+' cm</div></div>';
+    }).join('');
+    drawTide(tt,hh,ex,now);
+  }else{
+    $('events').innerHTML='<div class="sub" style="grid-column:1/-1">この地点では潮位データが取れませんでした。少し沖側の座標にすると取れることがあります。</div>';
+    drawTide([],[],[],now);
+  }
+}
+
+function drawTide(tt,hh,ex,now){
+  var cv=$('tide'),r=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*r;cv.height=H*r;var g=cv.getContext('2d');g.setTransform(r,0,0,r,0,0);g.clearRect(0,0,W,H);
+  var cs=getComputedStyle(document.documentElement);
+  function col(n){return cs.getPropertyValue(n).trim();}
+  var t0=new Date(now.getFullYear(),now.getMonth(),now.getDate()),t1=new Date(t0.getTime()+24*36e5);
+  var pl=8,pr=8,pt=22,pb=22,cw=W-pl-pr,ch=H-pt-pb;
+  var pts=[];for(var i=0;i<tt.length;i++){if(tt[i]>=t0&&tt[i]<=t1&&hh[i]!=null)pts.push([tt[i],hh[i]]);}
+  g.font='12px '+col('--num');g.fillStyle=col('--muted');g.strokeStyle=col('--line');g.lineWidth=1;
+  for(var hr=0;hr<=24;hr+=3){var x=pl+cw*hr/24;g.beginPath();g.moveTo(x,pt);g.lineTo(x,pt+ch);g.stroke();
+    g.textAlign=hr===0?'left':hr===24?'right':'center';g.fillText(hr+'時',x,H-6);}
+  if(pts.length<2)return;
+  var mn=Infinity,mx=-Infinity;pts.forEach(function(p){mn=Math.min(mn,p[1]);mx=Math.max(mx,p[1]);});
+  var pad=(mx-mn)*0.15||0.1;mn-=pad;mx+=pad;
+  function X(t){return pl+cw*(t-t0)/(t1-t0);}function Y(v){return pt+ch*(1-(v-mn)/(mx-mn));}
+  /* なめらかな曲線 */
+  g.beginPath();g.moveTo(X(pts[0][0]),Y(pts[0][1]));
+  for(i=1;i<pts.length;i++){var p0=pts[i-1],p1=pts[i],xm=(X(p0[0])+X(p1[0]))/2;
+    g.bezierCurveTo(xm,Y(p0[1]),xm,Y(p1[1]),X(p1[0]),Y(p1[1]));}
+  g.save();g.lineTo(X(pts[pts.length-1][0]),pt+ch);g.lineTo(X(pts[0][0]),pt+ch);g.closePath();
+  g.globalAlpha=.18;g.fillStyle=col('--tide');g.fill();g.restore();
+  g.beginPath();g.moveTo(X(pts[0][0]),Y(pts[0][1]));
+  for(i=1;i<pts.length;i++){p0=pts[i-1];p1=pts[i];xm=(X(p0[0])+X(p1[0]))/2;
+    g.bezierCurveTo(xm,Y(p0[1]),xm,Y(p1[1]),X(p1[0]),Y(p1[1]));}
+  g.strokeStyle=col('--tide');g.lineWidth=2.5;g.stroke();
+  /* 満干ラベル */
+  g.font='600 13px '+col('--num');g.textAlign='center';
+  ex.forEach(function(e){if(e.t<t0||e.t>t1)return;var x=X(e.t),y=Y(e.h);
+    g.fillStyle=col('--fg');g.beginPath();g.arc(x,y,3.5,0,7);g.fill();
+    var lx=Math.min(Math.max(x,24),W-24);
+    g.fillText(hm(e.t),lx,e.hi?y-8:y+16);});
+  /* 現在時刻 */
+  var nx=X(now);g.strokeStyle=col('--accent');g.lineWidth=2;g.beginPath();g.moveTo(nx,pt-6);g.lineTo(nx,pt+ch);g.stroke();
+  g.fillStyle=col('--accent');g.textAlign=nx>W-40?'right':'left';g.fillText('いま',nx+(nx>W-40?-4:4),pt-8);
+}
+
+function tick(){var d=new Date();$('clock').textContent=hm(d);
+  $('date').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日（'+'日月火水木金土'[d.getDay()]+'）';}
+
+function show(force){
+  renderTabs();
+  if(!state.locs.length){$('place').textContent='場所が未登録です';
+    $('status').textContent='「地点編集」から釣り場を検索して追加してください';return;}
+  var loc=state.locs[state.idx];
+  var key=loc.lat+','+loc.lon,c=state.cache[key];
+  if(c){render(loc,c.res);}
+  if(!force&&c&&Date.now()-c.at<REFRESH_MS){status(c.at);return;}
+  $('status').textContent='更新中…';
+  getData(loc,function(res){state.cache[key]={res:res,at:Date.now()};
+    if(state.locs[state.idx]===loc){try{render(loc,res);status(Date.now());}catch(e){showErr('表示エラー: '+e.message);}}},
+  function(e){showErr('取得に失敗しました（'+e+'）。通信を確認してください。自動で再試行します。');});
+}
+function showErr(t){$('status').innerHTML='<span class="err">'+t+'</span>';}
+window.onerror=function(msg){try{showErr('エラー: '+msg);}catch(e){}};
+function status(at){$('status').textContent='最終更新 '+hm(new Date(at));}
+
+function renderTabs(){
+  $('tabs').innerHTML='';
+  state.locs.forEach(function(l,i){var b=document.createElement('button');b.type='button';b.className='tab';
+    b.textContent=l.name;b.setAttribute('aria-pressed',i===state.idx);
+    b.onclick=function(){state.idx=i;save('tb_idx',i);show();};$('tabs').appendChild(b);});
+}
+function renderList(){
+  $('locList').innerHTML='';
+  state.locs.forEach(function(l,i){var d=document.createElement('div');d.className='row';
+    d.innerHTML='<span>'+l.name+' <span class="sub num">'+l.lat+', '+l.lon+'</span></span>';
+    var b=document.createElement('button');b.className='btn';b.type='button';b.textContent='削除';
+    b.disabled=state.locs.length<=1;
+    b.onclick=function(){state.locs.splice(i,1);if(state.idx>=state.locs.length)state.idx=0;save('tb_locs',state.locs);save('tb_idx',state.idx);renderList();show();};
+    d.appendChild(b);$('locList').appendChild(d);});
+}
+$('btnEdit').onclick=function(){openDlg();};
+$('btnClose').onclick=function(){var d=$('dlg');if(d.close)d.close();else d.removeAttribute('open');};
+$('fRotate').onchange=function(){state.rotate=this.checked;save('tb_rot',state.rotate);};
+function addLoc(n,la,lo){
+  state.locs.push({name:n,lat:+(+la).toFixed(4),lon:+(+lo).toFixed(4)});
+  state.idx=state.locs.length-1;save('tb_locs',state.locs);save('tb_idx',state.idx);
+  renderList();show(true);
+}
+$('btnAdd').onclick=function(){
+  var n=$('fName').value.trim(),la=parseFloat($('fLat').value),lo=parseFloat($('fLon').value);
+  if(!n||isNaN(la)||isNaN(lo)||Math.abs(la)>90||Math.abs(lo)>180){$('fName').placeholder='名前・緯度・経度を入力してください';return;}
+  addLoc(n,la,lo);$('fName').value=$('fLat').value=$('fLon').value='';
+};
+$('fSearch').onsubmit=function(ev){
+  ev.preventDefault();var q=$('fQuery').value.trim();if(!q)return;
+  var box=$('results');box.innerHTML='<div class="sub">検索中…</div>';
+  searchPlace(q,function(list,err){
+    box.innerHTML='';
+    if(!list.length){box.innerHTML='<div class="sub">'+(err?'検索に失敗しました（'+err+'）':'見つかりませんでした。別の言い方で試してください')+'</div>';return;}
+    list.forEach(function(p){
+      var b=document.createElement('button');b.type='button';b.className='btn';b.style.textAlign='left';
+      b.innerHTML=p.name+'<br><span class="sub num">'+p.lat.toFixed(4)+', '+p.lon.toFixed(4)+'</span>';
+      b.onclick=function(){
+        var short=p.name.replace(/^.+?[都道府県]/,'').replace(/^.+?[市郡]/,'')||p.name;
+        addLoc(short.length>12?q:short,p.lat,p.lon);box.innerHTML='<div class="sub">「'+(short.length>12?q:short)+'」を追加しました</div>';
+      };
+      box.appendChild(b);
+    });
+  });
+};
+function openDlg(){renderList();$('fRotate').checked=state.rotate;var d=$('dlg');if(d.showModal)d.showModal();else d.setAttribute('open','');}
+
+/* 画面を消さない（対応端末のみ） */
+function wake(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').catch(function(){});}catch(e){}}
+document.addEventListener('visibilitychange',function(){if(!document.hidden){wake();show();}});
+window.addEventListener('resize',function(){var l=state.locs[state.idx];if(!l)return;var c=state.cache[l.lat+','+l.lon];if(c)render(l,c.res);});
+
+tick();setInterval(tick,10000);
+setInterval(function(){
+  if(state.rotate&&state.locs.length>1){state.idx=(state.idx+1)%state.locs.length;save('tb_idx',state.idx);show();}
+},60000);
+setInterval(function(){show();},REFRESH_MS/3);
+setInterval(function(){var l=state.locs[state.idx];if(!l)return;var c=state.cache[l.lat+','+l.lon];if(c)render(l,c.res);},5*60000);
+wake();show(true);if(!state.locs.length)openDlg();
+})();
+</script>
+</body>
+</html>
